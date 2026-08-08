@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Vault - Personal Encrypt/Decrypt Tool
 Pure Python 3 only (uses the 'cryptography' package for strong encryption).
@@ -14,7 +13,6 @@ import os
 import sys
 import base64
 import getpass
-from datetime import datetime
 
 from cryptography.fernet import Fernet, InvalidToken
 from cryptography.hazmat.primitives import hashes
@@ -51,12 +49,6 @@ def show_logo():
 
 
 # ----------------------------------------------------------------------
-# OUTPUT FOLDER FOR SAVED ENCRYPTED TEXT
-# ----------------------------------------------------------------------
-ENCRYPTED_TEXT_DIR = "encrypted_texts"
-
-
-# ----------------------------------------------------------------------
 # CRYPTO HELPERS
 # ----------------------------------------------------------------------
 SALT_SIZE = 16
@@ -73,23 +65,6 @@ def derive_key(password: str, salt: bytes) -> bytes:
     )
     key = kdf.derive(password.encode("utf-8"))
     return base64.urlsafe_b64encode(key)
-
-
-def encrypt_text(plaintext: str, password: str) -> str:
-    salt = os.urandom(SALT_SIZE)
-    key = derive_key(password, salt)
-    token = Fernet(key).encrypt(plaintext.encode("utf-8"))
-    # Store salt + token together, base64-encoded, so decrypt only needs one string
-    payload = base64.urlsafe_b64encode(salt) + b"." + token
-    return payload.decode("utf-8")
-
-
-def decrypt_text(payload: str, password: str) -> str:
-    salt_b64, token = payload.split(".", 1)
-    salt = base64.urlsafe_b64decode(salt_b64.encode("utf-8"))
-    key = derive_key(password, salt)
-    plaintext = Fernet(key).decrypt(token.encode("utf-8"))
-    return plaintext.decode("utf-8")
 
 
 def encrypt_file(path: str, password: str) -> str:
@@ -137,60 +112,6 @@ def prompt_password(confirm: bool = False) -> str:
         return pw
 
 
-def menu_encrypt_text():
-    text = input("Enter text to encrypt: ")
-    password = prompt_password(confirm=True)
-    result = encrypt_text(text, password)
-
-    print("\nEncrypted text (you'll need the same password to decrypt):\n")
-    print(result)
-    print()
-
-    os.makedirs(ENCRYPTED_TEXT_DIR, exist_ok=True)
-    default_name = f"encrypted_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
-    filename = input(
-        f"Save to file [{default_name}] (press Enter to accept, or type a name, "
-        f"or '-' to skip saving): "
-    ).strip()
-
-    if filename == "-":
-        print("Not saved to a file.\n")
-        return
-
-    if not filename:
-        filename = default_name
-
-    out_path = os.path.join(ENCRYPTED_TEXT_DIR, filename)
-    with open(out_path, "w", encoding="utf-8") as f:
-        f.write(result)
-
-    print(f"\nSaved to: {os.path.abspath(out_path)}\n")
-
-
-def menu_decrypt_text():
-    source = input(
-        "Enter path to encrypted .txt file, or press Enter to paste text directly: "
-    ).strip()
-
-    if source:
-        if not os.path.isfile(source):
-            print("File not found.\n")
-            return
-        with open(source, "r", encoding="utf-8") as f:
-            payload = f.read().strip()
-    else:
-        payload = input("Paste encrypted text: ").strip()
-
-    password = prompt_password(confirm=False)
-    try:
-        result = decrypt_text(payload, password)
-        print("\nDecrypted text:\n")
-        print(result)
-        print()
-    except (InvalidToken, ValueError):
-        print("\nDecryption failed. Wrong password or corrupted/invalid data.\n")
-
-
 def menu_encrypt_file():
     path = input("Path to file to encrypt: ").strip()
     if not os.path.isfile(path):
@@ -218,26 +139,19 @@ def main():
     show_logo()
     menu = """
 Choose an option:
-  1) Encrypt text
-  2) Decrypt text
-  3) Encrypt a file
-  4) Decrypt a file
-  5) Exit
+  1) Encrypt a file
+  2) Decrypt a file
+  3) Exit
 """
     while True:
         print(menu)
         choice = input("> ").strip()
         print()
         if choice == "1":
-            menu_encrypt_text()
-        elif choice == "2":
-            menu_decrypt_text()
-        elif choice == "3":
             menu_encrypt_file()
-        elif choice == "4":
+        elif choice == "2":
             menu_decrypt_file()
-        elif choice == "5":
-            print("Goodbye.")
+        elif choice == "3":
             sys.exit(0)
         else:
             print("Invalid choice, try again.\n")
@@ -247,5 +161,5 @@ if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        print("\nInterrupted. Goodbye.")
+        print()
         sys.exit(0)
